@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Political Compass</title>
+    <style>
+        :root { --primary: #2563eb; --bg: #ffffff; --text: #0f172a; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #e2e8f0; color: var(--text); margin: 0; display: flex; justify-content: center; padding: 20px; }
+        #app-container { background: var(--bg); padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.3); width: 100%; max-width: 800px; text-align: center; border: 3px solid #cbd5e1; }
+        
+        h1 { font-size: 2.5rem; color: var(--primary); margin-bottom: 10px; }
+        .screen { display: none; }
+        .active { display: block; animation: fadeIn 0.4s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .lang-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
+        .lang-btn { background: #f8fafc; border: 3px solid #cbd5e1; padding: 15px; border-radius: 12px; cursor: pointer; font-size: 1.2rem; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        
+        .btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+        .btn { padding: 18px; border: none; border-radius: 12px; cursor: pointer; font-size: 1.3rem; font-weight: bold; color: white; box-shadow: 0 4px 0 rgba(0,0,0,0.2); }
+        .btn:active { transform: translateY(2px); box-shadow: none; }
+        
+        .btn-sa { background: #15803d; } .btn-a { background: #22c55e; } .btn-n { background: #64748b; } .btn-d { background: #ef4444; } .btn-sd { background: #b91c1c; }
+        .btn-back { background: #475569; margin-top: 10px; font-size: 1rem; padding: 10px; color: white; border: none; border-radius: 8px; cursor: pointer; width: 120px; align-self: center; }
+
+        #ideology-label { font-size: 2.2rem; font-weight: 900; margin: 20px 0; text-transform: uppercase; padding: 15px; border: 6px solid; display: inline-block; line-height: 1.1; }
+        canvas { background: white; border: 4px solid #1e293b; border-radius: 8px; width: 100%; max-width: 400px; }
+        .search-box { width: 100%; padding: 15px; font-size: 1.1rem; border: 2px solid #cbd5e1; border-radius: 8px; margin-top: 10px; box-sizing: border-box;}
+        .leader-item { padding: 12px; background: #f1f5f9; border-bottom: 1px solid #ddd; cursor: pointer; text-align: left; }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <div id="screen-lang" class="screen active">
+        <h1>Select Language</h1>
+        <div class="lang-grid">
+            <button class="lang-btn" onclick="setLang('bg')">Български</button>
+            <button class="lang-btn" onclick="setLang('en')">English</button>
+            <button class="lang-btn" onclick="setLang('de')">Deutsch</button>
+            <button class="lang-btn" onclick="setLang('fr')">Français</button>
+            <button class="lang-btn" onclick="setLang('es')">Español</button>
+            <button class="lang-btn" onclick="setLang('ru')">Русский</button>
+        </div>
+    </div>
+
+    <div id="screen-quiz" class="screen">
+        <div id="progress" style="font-weight: bold; margin-bottom: 10px;"></div>
+        <div id="q-text" style="font-size: 1.5rem; min-height: 120px; font-weight: bold; padding: 20px; background: #f8fafc; border-radius: 10px; border: 1px solid #cbd5e1; display: flex; align-items: center; justify-content: center; margin-bottom: 20px;"></div>
+        <div class="btn-group" id="quiz-btns"></div>
+        <button class="btn-back" id="back-btn" onclick="goBack()">← BACK</button>
+    </div>
+
+    <div id="screen-result" class="screen">
+        <h2 id="res-title"></h2>
+        <div id="ideology-label"></div>
+        <canvas id="compassCanvas" width="400" height="400"></canvas>
+        <div style="margin-top: 20px; text-align: left;">
+            <b id="comp-text"></b>
+            <input type="text" class="search-box" id="leader-in" onkeyup="searchLeaders()">
+            <div id="leader-list" style="max-height: 200px; overflow-y: auto;"></div>
+        </div>
+        <button class="btn" style="background:var(--primary); width:100%; margin-top:20px;" onclick="location.reload()">RESTART</button>
+    </div>
+</div>
+
+<script>
+    // Scale: X (-10 to 10), Y (-10 to 10)
+    // X: Negative = Left, Positive = Right
+    // Y: Negative = Authoritarian, Positive = Libertarian
+    const leaders = [
+        // Authoritarian Right (Blue)
+        { name: "Adolf Hitler", x: 6, y: -9 },
+        { name: "Benito Mussolini", x: 4, y: -10 },
+        { name: "Augusto Pinochet", x: 8, y: -9 },
+        { name: "Margaret Thatcher", x: 7, y: -4 },
+        { name: "Ronald Reagan", x: 6, y: -5 },
+        { name: "Donald Trump", x: 6, y: -5 },
+        { name: "Winston Churchill", x: 4, y: -5 },
+        { name: "Vladimir Putin", x: 5, y: -8 },
+        
+        // Authoritarian Left (Red)
+        { name: "Joseph Stalin", x: -9, y: -9 },
+        { name: "Mao Zedong", x: -10, y: -10 },
+        { name: "Vladimir Lenin", x: -10, y: -7 },
+        { name: "Fidel Castro", x: -8, y: -8 },
+        { name: "Todor Zhivkov", x: -8, y: -8 },
+
+        // Libertarian Left (Green)
+        { name: "Mahatma Gandhi", x: -4, y: 5 },
+        { name: "Nelson Mandela", x: -4, y: 3 },
+        { name: "Bernie Sanders", x: -6, y: 4 },
+        { name: "George Orwell", x: -6, y: 6 },
+        { name: "Emma Goldman", x: -9, y: 9 },
+        { name: "Vasil Levski", x: -4, y: 8 },
+
+        // Libertarian Right (Yellow)
+        { name: "Javier Milei", x: 9, y: 7 },
+        { name: "Ron Paul", x: 8, y: 6 },
+        { name: "Milton Friedman", x: 8, y: 4 },
+        { name: "Murray Rothbard", x: 10, y: 10 },
+
+        // Centrists / Moderates (Grey Zone)
+        { name: "Joe Biden", x: 2, y: -2 },
+        { name: "Barack Obama", x: 1, y: -1 },
+        { name: "Emmanuel Macron", x: 3, y: -2 },
+        { name: "Angela Merkel", x: 2, y: -1 }
+    ];
+
+    const questions = [
+        // Economic (X)
+        { bg: "Богатите трябва да плащат по-високи данъци.", en: "The rich should pay higher taxes.", de: "Reiche sollten höhere Steuern zahlen.", fr: "Les riches devraient payer plus d'impôts.", es: "Los ricos deberían pagar más impuestos.", ru: "Богатые должны платить больше налогов.", a: "x", w: -1 },
+        { bg: "Свободният пазар е по-добър от държавния контрол.", en: "Free market is better than state control.", de: "Freier Markt ist besser als Staatskontrolle.", fr: "Le marché libre est meilleur que le contrôle étatique.", es: "El libre mercado es mejor que el control estatal.", ru: "Свободный рынок лучше государственного контроля.", a: "x", w: 1 },
+        { bg: "Здравеопазването трябва да е безплатно.", en: "Healthcare should be free.", de: "Gesundheitswesen sollte kostenlos sein.", fr: "La santé devrait être gratuite.", es: "La salud debería ser gratuita.", ru: "Медицина должна быть бесплатной.", a: "x", w: -1 },
+        { bg: "Държавата трябва да притежава важни ресурси.", en: "State should own key resources.", de: "Der Staat sollte wichtige Ressourcen besitzen.", fr: "L'État devrait posséder les ressources clés.", es: "El Estado debería poseer los recursos clave.", ru: "Государство должно владеть ключевыми ресурсами.", a: "x", w: -1 },
+        { bg: "Данъците трябва да са ниски за бизнеса.", en: "Taxes should be low for businesses.", de: "Steuern für Unternehmen sollten niedrig sein.", fr: "Les taxes devraient être basses pour les entreprises.", es: "Los impuestos a las empresas deberían ser bajos.", ru: "Налоги для бизнеса должны быть низкими.", a: "x", w: 1 },
+        { bg: "Приватизацията е добра.", en: "Privatization is good.", de: "Privatisierung ist gut.", fr: "La privatisation est une bonne chose.", es: "La privatización es buena.", ru: "Приватизация — это хорошо.", a: "x", w: 1 },
+        { bg: "Държавата трябва да помага на бедните.", en: "The state should help the poor.", de: "Der Staat sollte den Armen helfen.", fr: "L'État devrait aider les pauvres.", es: "El Estado debería ayudar a los pobres.", ru: "Государство должно помогать бедным.", a: "x", w: -1 },
+        { bg: "Минималната заплата трябва да се вдигне.", en: "Minimum wage should be increased.", de: "Der Mindestlohn sollte erhöht werden.", fr: "Le salaire minimum devrait être augmenté.", es: "El salario mínimo debería aumentar.", ru: "Минимальная зарплата должна быть повышена.", a: "x", w: -1 },
+        { bg: "Икономическият растеж е най-важен.", en: "Economic growth is most important.", de: "Wirtschaftswachstum ist am wichtigsten.", fr: "La croissance économique est primordiale.", es: "El crecimiento económico es lo más importante.", ru: "Экономический рост важнее всего.", a: "x", w: 1 },
+        { bg: "Синдикатите са нужни.", en: "Labor unions are necessary.", de: "Gewerkschaften sind notwendig.", fr: "Les syndicats sont nécessaires.", es: "Los sindicatos son necesarios.", ru: "Профсоюзы необходимы.", a: "x", w: -1 },
+        { bg: "Държавните субсидии са вредни.", en: "Government subsidies are harmful.", de: "Staatliche Subventionen sind schädlich.", fr: "Les subventions gouvernementales sont nuisibles.", es: "Los subsidios estatales son perjudiciales.", ru: "Государственные субсидии вредны.", a: "x", w: 1 },
+        { bg: "Пазарът се саморегулира.", en: "The market regulates itself.", de: "Der Markt reguliert sich selbst.", fr: "Le marché se régule de lui-même.", es: "El mercado se regula a sí mismo.", ru: "Рынок регулирует сам себя.", a: "x", w: 1 },
+        // Social (Y)
+        { bg: "Дисциплината е по-важна от свободата.", en: "Discipline over liberty.", de: "Disziplin über Freiheit.", fr: "La discipline prime sur la liberté.", es: "La disciplina antes que la libertad.", ru: "Дисциплина важнее свободы.", a: "y", w: -1 },
+        { bg: "Традициите трябва да се пазят.", en: "Traditions must be kept.", de: "Traditionen müssen bewahrt werden.", fr: "Les traditions doivent être conservées.", es: "Las tradiciones deben preservarse.", ru: "Традиции нужно сохранять.", a: "y", w: -1 },
+        { bg: "Всеки може да прави каквото иска вкъщи.", en: "Freedom at home is absolute.", de: "Freiheit zu Hause ist absolut.", fr: "La liberté à la maison est absolue.", es: "La libertad en casa es absoluta.", ru: "Свобода дома абсолютна.", a: "y", w: 1 },
+        { bg: "Армията трябва да е много силна.", en: "Military must be very strong.", de: "Das Militär muss sehr stark sein.", fr: "L'armée doit être très forte.", es: "El ejército debe ser muy fuerte.", ru: "Армия должна быть очень сильной.", a: "y", w: -1 },
+        { bg: "Религията трябва да е част от законите.", en: "Religion should be part of laws.", de: "Religion sollte Teil der Gesetze sein.", fr: "La religion devrait influencer les lois.", es: "La religión debería influir en las leyes.", ru: "Религия должна быть частью законов.", a: "y", w: -1 },
+        { bg: "Свободата на словото е свещена.", en: "Free speech is sacred.", de: "Redefreiheit ist heilig.", fr: "La liberté d'expression est sacrée.", es: "La libertad de expression es sagrada.", ru: "Свобода слова священна.", a: "y", w: 1 },
+        { bg: "Смъртното наказание е нужно.", en: "Death penalty is needed.", de: "Die Todesstrafe ist notwendig.", fr: "La peine de mort est nécessaire.", es: "La pena de muerte es necesaria.", ru: "Смертная казнь необходима.", a: "y", w: -1 },
+        { bg: "Държавата не трябва да ме следи.", en: "State shouldn't spy on me.", de: "Der Staat sollte mich nicht ausspionieren.", fr: "L'État ne devrait pas m'espionner.", es: "El Estado no debería espiarme.", ru: "Государство не должно следить за мной.", a: "y", w: 1 },
+        { bg: "Нацията е над всичко.", en: "The nation comes first.", de: "Die Nation steht an erster Stelle.", fr: "La nation passe avant tout.", es: "La nación es lo primero.", ru: "Нация превыше всего.", a: "y", w: -1 },
+        { bg: "Личният избор е най-важен.", en: "Personal choice is key.", de: "Persönliche Entscheidungen sind wichtig.", fr: "Le choix personnel est essentiel.", es: "La elección personal es clave.", ru: "Личный выбор — главное.", a: "y", w: 1 },
+        { bg: "Полицията се нуждае от повече власт.", en: "Police need more power.", de: "Die Polizei braucht mehr Macht.", fr: "La police a besoin de plus de pouvoir.", es: "La policía necesita más poder.", ru: "Полиции нужно больше власти.", a: "y", w: -1 },
+        { bg: "Протестите са право на всеки.", en: "Protesting is a human right.", de: "Protestieren ist ein Menschenrecht.", fr: "Manifester est un droit humain.", es: "Protestar es un derecho humano.", ru: "Протест — это право каждого.", a: "y", w: 1 }
+    ];
+
+    const dict = {
+        bg: { btns: ["Твърдо ДА", "Да", "Неутрално", "Не", "Твърдо НЕ"], res: "Резултат:", comp: "Сравни с лидери:", search: "Търси политик..." },
+        en: { btns: ["Strongly Agree", "Agree", "Neutral", "Disagree", "Strongly Disagree"], res: "Result:", comp: "Compare with leaders:", search: "Search a politician..." },
+        de: { btns: ["Stimme voll zu", "Ja", "Neutral", "Nein", "Stimme gar nicht zu"], res: "Ergebnis:", comp: "Vergleichen:", search: "Politiker suchen..." },
+        fr: { btns: ["Tout à fait", "Oui", "Neutre", "Non", "Pas du tout"], res: "Résultat:", comp: "Comparer:", search: "Chercher un politicien..." },
+        es: { btns: ["Totalmente", "Sí", "Neutral", "No", "Para nada"], res: "Resultado:", comp: "Comparar:", search: "Buscar un político..." },
+        ru: { btns: ["Согласен!", "Да", "Нейтрально", "Нет", "Ни в коем случае"], res: "Результат:", comp: "Сравнить:", search: "Поиск политика..." }
+    };
+
+    let lang = 'en'; let qIdx = 0; let scoreX = 0; let scoreY = 0; let history = []; let selectedLeaders = [];
+
+    function setLang(l) { lang = l; showScreen('screen-quiz'); updateQuiz(); }
+
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+
+    function updateQuiz() {
+        const q = questions[qIdx];
+        document.getElementById('progress').innerText = `${qIdx + 1} / ${questions.length}`;
+        document.getElementById('q-text').innerText = q[lang] || q['en']; 
+        
+        const btnsBox = document.getElementById('quiz-btns');
+        btnsBox.innerHTML = '';
+        const vals = [2, 1, 0, -1, -2];
+        const classes = ['btn-sa', 'btn-a', 'btn-n', 'btn-d', 'btn-sd'];
+        vals.forEach((v, i) => {
+            const b = document.createElement('button');
+            b.className = `btn ${classes[i]}`;
+            b.innerText = dict[lang].btns[i];
+            b.onclick = () => answer(v);
+            btnsBox.appendChild(b);
+        });
+        document.getElementById('back-btn').style.display = qIdx === 0 ? 'none' : 'block';
+    }
+
+    function answer(m) {
+        const q = questions[qIdx];
+        const val = m * q.w;
+        history.push({ axis: q.a, val: val });
+        
+        if (q.a === 'x') {
+            scoreX += val;
+        } else {
+            scoreY += val; 
+        }
+        
+        qIdx++;
+        if(qIdx >= questions.length) finish(); else updateQuiz();
+    }
+
+    function goBack() {
+        qIdx--;
+        const last = history.pop();
+        if (last.axis === 'x') {
+            scoreX -= last.val;
+        } else {
+            scoreY -= last.val;
+        }
+        updateQuiz();
+    }
+
+    function finish() {
+        showScreen('screen-result');
+        document.getElementById('res-title').innerText = dict[lang].res;
+        document.getElementById('comp-text').innerText = dict[lang].comp;
+        document.getElementById('leader-in').placeholder = dict[lang].search;
+        
+        const lab = document.getElementById('ideology-label');
+        let idName = ""; let idCol = "";
+
+        if (Math.abs(scoreX) <= 3 && Math.abs(scoreY) <= 3) {
+            idName = "CENTRIST"; idCol = "#64748b";
+        } else if (scoreX <= -6 && scoreY <= -6) {
+            idName = "COMMUNISM"; idCol = "#b91c1c";
+        } else if (scoreX <= -6 && scoreY >= 6) {
+            idName = "ANARCHO-SOCIALISM"; idCol = "#059669";
+        } else if (scoreX >= 6 && scoreY <= -6) {
+            idName = "NAZISM / FASCISM"; idCol = "#1e293b";
+        } else if (scoreX >= 6 && scoreY >= 6) {
+            idName = "ANARCHO-CAPITALISM"; idCol = "#ca8a04";
+        } else if (scoreX < 0 && scoreY < 0) {
+            idName = "SOCIALISM"; idCol = "#dc2626";
+        } else if (scoreX > 0 && scoreY < 0) {
+            idName = "NATIONALISM"; idCol = "#2563eb";
+        } else if (scoreX < 0 && scoreY > 0) {
+            idName = "PROGRESSIVISM"; idCol = "#10b981";
+        } else {
+            idName = "LIBERTARIANISM"; idCol = "#f59e0b";
+        }
+
+        lab.innerText = idName;
+        lab.style.color = idCol;
+        lab.style.borderColor = idCol;
+        draw();
+    }
+
+    function draw() {
+        const canvas = document.getElementById('compassCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0,0,400,400);
+        
+        // Quadrant colors
+        ctx.fillStyle = "#fecaca"; ctx.fillRect(0,0,200,200); // AuthLeft
+        ctx.fillStyle = "#bfdbfe"; ctx.fillRect(200,0,200,200); // AuthRight
+        ctx.fillStyle = "#bbf7d0"; ctx.fillRect(0,200,200,200); // LibLeft
+        ctx.fillStyle = "#fef08a"; ctx.fillRect(200,200,200,200); // LibRight
+        
+        // Grid lines
+        ctx.strokeStyle = "#000"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(200,0); ctx.lineTo(200,400); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0,200); ctx.lineTo(400,200); ctx.stroke();
+
+        // Draw selected leaders (Mapped to a -10 to 10 scale)
+        // Multiplying by 20 means a score of 10 hits exactly 200px (the edge)
+        selectedLeaders.forEach(l => {
+            const lx = 200 + (l.x * 20); 
+            const ly = 200 + (l.y * 20);
+            
+            ctx.fillStyle = "black"; ctx.beginPath(); ctx.arc(lx, ly, 5, 0, Math.PI*2); ctx.fill();
+            
+            // Text shadow for readability
+            ctx.font = "bold 12px Arial";
+            ctx.fillStyle = "white";
+            ctx.fillText(l.name, lx + 7, ly + 3);
+            ctx.fillText(l.name, lx + 9, ly + 3);
+            ctx.fillText(l.name, lx + 8, ly + 2);
+            ctx.fillText(l.name, lx + 8, ly + 4);
+            
+            ctx.fillStyle = "black";
+            ctx.fillText(l.name, lx + 8, ly + 3);
+        });
+
+        // Mapping the user's 24 questions onto a 400x400 Canvas
+        const ux = 200 + (scoreX / 24 * 200);
+        const uy = 200 + (scoreY / 24 * 200);
+        
+        ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(ux, uy, 10, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = "red"; ctx.lineWidth = 3; ctx.stroke();
+    }
+
+    function searchLeaders() {
+        const val = document.getElementById('leader-in').value.toLowerCase();
+        const list = document.getElementById('leader-list');
+        list.innerHTML = "";
+        if(!val) return;
+        leaders.filter(l => l.name.toLowerCase().includes(val)).forEach(l => {
+            const div = document.createElement('div'); div.className = 'leader-item'; div.innerText = l.name;
+            div.onclick = () => { 
+                if(!selectedLeaders.includes(l)) selectedLeaders.push(l); 
+                draw(); 
+                list.innerHTML = ""; 
+                document.getElementById('leader-in').value=""; 
+            };
+            list.appendChild(div);
+        });
+    }
+</script>
+</body>
+</html>
